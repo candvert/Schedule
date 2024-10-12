@@ -25,10 +25,16 @@ QString Form::contentText()
     return content;
 }
 
+QWidget *Form::lineEdit()
+{
+    return ui->lineEdit;
+}
+
 void Form::closeEvent(QCloseEvent *)
 {
     ui->lineEdit->setText("");
     ui->textEdit->setPlainText("");
+    emit buttonClicked();
 }
 
 void Form::slotButtonClicked()

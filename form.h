@@ -24,6 +24,7 @@ public:
     ~Form();
     QString titleText();
     QString contentText();
+    QWidget *lineEdit();
 
 protected:
     virtual void closeEvent(QCloseEvent *event) override;

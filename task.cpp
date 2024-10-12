@@ -25,6 +25,7 @@ Task::Task(QWidget *parent)
         emit deleteSignal(title);
         delete this;
     });
+    connect(checkBox, &QCheckBox::clicked, this, [this](){emit checkedSignal();});
 }
 
 void Task::mousePressEvent(QMouseEvent *event)

@@ -17,17 +17,18 @@ class Task : public QWidget
 public:
     explicit Task(QWidget *parent = nullptr);
     QAction *action;
+    QCheckBox *checkBox;
     QLabel *label;
 
 signals:
     void actionSignal();
     void deleteSignal(QString title);
+    void checkedSignal();
 
 protected:
     virtual void mousePressEvent(QMouseEvent *e) override;
 
 private:
-    QCheckBox *checkBox;
     QPushButton *button;
     QMenu *contextMenu;
 };

@@ -70,6 +70,9 @@
           <pointsize>12</pointsize>
          </font>
         </property>
+        <property name="styleSheet">
+         <string notr="true">background-color: rgb(255, 220, 192);</string>
+        </property>
         <property name="text">
          <string>当前目标：</string>
         </property>

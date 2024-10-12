@@ -27,12 +27,6 @@ class Widget : public QWidget
 public:
     Widget(QWidget *parent = nullptr);
     ~Widget();
-    QList<QString> todayList;
-    QList<QString> weekList;
-    QList<QString> monthList;
-    QList<QString> today2List;
-    QList<QString> week2List;
-    QList<QString> month2List;
     Form *form;
 
 protected:
@@ -45,10 +39,15 @@ public slots:
     void monthButtonClicked();
     void addButtonClicked();
     void deleteTask(QString title);
+    void checkBox();
 
 private:
     Ui::Widget *ui;
     int openedForm;
     QVBoxLayout *todayLayout;
+    QVBoxLayout *weekLayout;
+    QVBoxLayout *monthLayout;
+    void loadData(QVBoxLayout *layout, QString tabel);
+    void sqlOperation(QString operation, Task *task);
 };
 #endif // WIDGET_H
