@@ -4,12 +4,12 @@
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QLabel>
-#include <QList>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlRecord>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QKeyEvent>
 #include <QFile>
 #include "form.h"
 #include "task.h"
@@ -31,6 +31,7 @@ public:
 
 protected:
     virtual void closeEvent(QCloseEvent *event) override;
+    virtual void keyPressEvent(QKeyEvent *event) override;
 
 public slots:
     void actionClicked();
@@ -40,14 +41,19 @@ public slots:
     void addButtonClicked();
     void deleteTask(QString title);
     void checkBox();
+    void editTask();
 
 private:
     Ui::Widget *ui;
     int openedForm;
+    bool isEditing;
     QVBoxLayout *todayLayout;
     QVBoxLayout *weekLayout;
     QVBoxLayout *monthLayout;
+    Task *task;
+    QSqlDatabase db;
+    QSqlQuery query;
     void loadData(QVBoxLayout *layout, QString tabel);
-    void sqlOperation(QString operation, Task *task);
+    QString sqlOperation(QString operation, Task *task);
 };
 #endif // WIDGET_H

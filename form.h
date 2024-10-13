@@ -2,7 +2,7 @@
 #define FORM_H
 
 #include <QWidget>
-#include <QCloseEvent>
+#include <QHideEvent>
 #include <QPushButton>
 
 namespace Ui {
@@ -15,6 +15,7 @@ class Form : public QWidget
 
 signals:
     void buttonClicked();
+    void escapePressed();
 
 public slots:
     void slotButtonClicked();
@@ -24,10 +25,12 @@ public:
     ~Form();
     QString titleText();
     QString contentText();
+    bool setTitle(const QString &title);
+    bool setContent(const QString &content);
     QWidget *lineEdit();
 
 protected:
-    virtual void closeEvent(QCloseEvent *event) override;
+    virtual void hideEvent(QHideEvent *event) override;
     virtual void keyPressEvent(QKeyEvent *event) override;
 
 private:

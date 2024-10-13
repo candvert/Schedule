@@ -38,8 +38,7 @@ void Task::mousePressEvent(QMouseEvent *event)
         if (child->isWidgetType()) {
             if (qobject_cast<QLabel*>(child)) {
                 if (event->button() == Qt::LeftButton) {
-                    qDebug() << "left click";
-                    // TODO显示详情页
+                    emit editSignal();
                 } else if (event->button() == Qt::RightButton) {
                     contextMenu = new QMenu(this);
 

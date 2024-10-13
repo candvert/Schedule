@@ -4,10 +4,17 @@
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::Widget)
+    , isEditing(false)
+    , db(QSqlDatabase::addDatabase("QSQLITE", "conn"))
+    , query(db)
 {
     ui->setupUi(this);
 
     form = new Form();
+    db.setDatabaseName("record.db");
+    if (!db.open()) {
+        qDebug() << "Error: unalbe to open database";
+    }
 
     // 加载数据
     todayLayout = new QVBoxLayout();
@@ -22,6 +29,11 @@ Widget::Widget(QWidget *parent)
     connect(ui->weekButton, &QPushButton::clicked, this, &Widget::weekButtonClicked);
     connect(ui->monthButton, &QPushButton::clicked, this, &Widget::monthButtonClicked);
     connect(form, &Form::buttonClicked, this, &Widget::addButtonClicked);
+    connect(form, &Form::escapePressed, this, [this](){
+        form->hide();
+        this->move(form->pos());
+        this->show();
+    });
 
     // 设置布局
     ui->todayTasks->setLayout(todayLayout);
@@ -36,40 +48,36 @@ Widget::Widget(QWidget *parent)
     if (ui->currentTask->text() == "") {
         ui->currentTask->setText("当前任务：");
     }
+    file.close();
 }
 
 Widget::~Widget()
 {
+    delete form;
+    delete task;
+    delete todayLayout;
+    delete weekLayout;
+    delete monthLayout;
     delete ui;
 }
 
 void Widget::loadData(QVBoxLayout *layout, QString tabel)
 {
     // 加载数据
-    {
-        QSqlDatabase todayDB = QSqlDatabase::addDatabase("QSQLITE", "conn");
-        todayDB.setDatabaseName("record.db");
-        if (!todayDB.open()) {
-            qDebug() << "Error: unalbe to open database";
-            return;
-        }
-
-        QSqlQuery todayQuery(todayDB);
-        todayQuery.exec(QString("CREATE TABLE IF NOT EXISTS %1 (id INTEGER PRIMARY KEY "
-                                "AUTOINCREMENT, title TEXT, content TEXT, "
-                                "checked INTEGER)").arg(tabel));
-        todayQuery.exec(QString("SELECT title, content, checked FROM %1").arg(tabel));
-        while (todayQuery.next()) {
-            Task *task = new Task();
-            task->label->setText(todayQuery.value(0).toString());
-            task->checkBox->setChecked(todayQuery.value(2).toInt());
-            layout->addWidget(task);
-            connect(task, &Task::actionSignal, this, &Widget::actionClicked);
-            connect(task, &Task::deleteSignal, this, &Widget::deleteTask);
-            connect(task, &Task::checkedSignal, this, &Widget::checkBox);
-        }
+    query.exec(QString("CREATE TABLE IF NOT EXISTS %1 (id INTEGER PRIMARY KEY "
+                            "AUTOINCREMENT, title TEXT, content TEXT, "
+                            "checked INTEGER)").arg(tabel));
+    query.exec(QString("SELECT title, content, checked FROM %1").arg(tabel));
+    while (query.next()) {
+        Task *task = new Task();
+        task->label->setText(query.value(0).toString());
+        task->checkBox->setChecked(query.value(2).toInt());
+        layout->addWidget(task);
+        connect(task, &Task::actionSignal, this, &Widget::actionClicked);
+        connect(task, &Task::deleteSignal, this, &Widget::deleteTask);
+        connect(task, &Task::checkedSignal, this, &Widget::checkBox);
+        connect(task, &Task::editSignal, this, &Widget::editTask);
     }
-    QSqlDatabase::removeDatabase("conn");
 
     // 设置布局
     layout->setSpacing(0);
@@ -132,8 +140,40 @@ void Widget::closeEvent(QCloseEvent*)
 
 void Widget::addButtonClicked()
 {
+    if (isEditing == true) {
+        QString table = sqlOperation("NULL", nullptr);
+
+        query.prepare(QString("SELECT id FROM %1 WHERE title = ?").arg(table));
+        query.addBindValue(task->label->text());
+        query.exec();
+        query.next();
+        int id = query.value("id").toInt();
+
+        if (form->titleText() == "") {
+            query.prepare(QString("DELETE FROM %1 WHERE id = ?").arg(table));
+            query.addBindValue(id);
+            query.exec();
+            delete task;
+        } else {
+            query.prepare(QString("UPDATE %1 SET title = ?, content = ? where id = ?").arg(table));
+            query.addBindValue(form->titleText());
+            query.addBindValue(form->contentText());
+            query.addBindValue(id);
+            query.exec();
+            task->label->setText(form->titleText());
+        }
+
+        task = nullptr;
+        isEditing = false;
+
+        form->hide();
+        this->move(form->pos());
+        this->show();
+        return;
+    }
+
     if (form->titleText() == "") {
-        form->close();
+        form->hide();
         this->move(form->pos());
         this->show();
         return;
@@ -146,13 +186,14 @@ void Widget::addButtonClicked()
     connect(task, &Task::actionSignal, this, &Widget::actionClicked);
     connect(task, &Task::deleteSignal, this, &Widget::deleteTask);
     connect(task, &Task::checkedSignal, this, &Widget::checkBox);
+    connect(task, &Task::editSignal, this, &Widget::editTask);
     if (openedForm == 0)
         todayLayout->addWidget(task);
     else if (openedForm == 1)
         weekLayout->addWidget(task);
     else if (openedForm == 2)
         monthLayout->addWidget(task);
-    form->close();
+    form->hide();
     this->move(form->pos());
     this->show();
 }
@@ -166,9 +207,9 @@ void Widget::deleteTask(QString title)
     }
 }
 
-void Widget::sqlOperation(QString operation, Task *task)
+QString Widget::sqlOperation(QString operation, Task *task)
 {
-    // 判断是更新、插入还是删除数据，并判断是操作的是今天、本周还是本月
+    // task不为空使用其parent判断操作的是哪张表
     QString current;
     if (task) {
         if (task->parent() == qobject_cast<QObject*>(ui->todayTasks)) {
@@ -188,33 +229,62 @@ void Widget::sqlOperation(QString operation, Task *task)
         }
     }
 
-    // 实际操纵数据库
-    {
-        QSqlDatabase todayDB = QSqlDatabase::addDatabase("QSQLITE", "conn");
-        todayDB.setDatabaseName("record.db");
-        if (!todayDB.open()) {
-            qDebug() << "Error: unalbe to open database";
-            return;
-        }
+    if (operation == "NULL") return current;
 
-        QSqlQuery todayQuery(todayDB);
-        if (operation == "UPDATE") {
-            todayQuery.prepare(QString("UPDATE %1 SET checked = ? where title = ?").arg(current));
-            todayQuery.addBindValue(task->checkBox->isChecked());
-            todayQuery.addBindValue(task->label->text());
-            todayQuery.exec();
-        } else if (operation == "INSERT") {
-            todayQuery.prepare(QString("INSERT INTO %1 (title, content, checked)"
-                                       " VALUES (?, ?, ?)").arg(current));
-            todayQuery.addBindValue(form->titleText());
-            todayQuery.addBindValue(form->contentText());
-            todayQuery.addBindValue(0);
-            todayQuery.exec();
-        } else if (operation == "DELETE") {
-            todayQuery.prepare(QString("DELETE FROM %1 WHERE title = ?").arg(current));
-            todayQuery.addBindValue(task->label->text());
-            todayQuery.exec();
-        }
+    // 实际操纵数据库
+    if (operation == "UPDATE") {
+        query.prepare(QString("UPDATE %1 SET checked = ? where title = ?").arg(current));
+        query.addBindValue(task->checkBox->isChecked());
+        query.addBindValue(task->label->text());
+        query.exec();
+    } else if (operation == "INSERT") {
+        query.prepare(QString("INSERT INTO %1 (title, content, checked)"
+                                   " VALUES (?, ?, ?)").arg(current));
+        query.addBindValue(form->titleText());
+        query.addBindValue(form->contentText());
+        query.addBindValue(0);
+        query.exec();
+    } else if (operation == "DELETE") {
+        query.prepare(QString("DELETE FROM %1 WHERE title = ?").arg(current));
+        query.addBindValue(task->label->text());
+        query.exec();
+    } else if (operation == "SELECT") {
+        query.prepare(QString("SELECT title, content FROM %1 WHERE title = ?").arg(current));
+        query.addBindValue(task->label->text());
+        query.exec();
     }
-    QSqlDatabase::removeDatabase("conn");
+    return current;
+}
+
+void Widget::keyPressEvent(QKeyEvent *event)
+{
+    if (event->key() == Qt::Key_1) {
+        todayButtonClicked();
+    } else if (event->key() == Qt::Key_2) {
+        weekButtonClicked();
+    } else if (event->key() == Qt::Key_3) {
+        monthButtonClicked();
+    } else if (event->key() == Qt::Key_Escape) {
+        this->close();
+    }
+}
+
+void  Widget::editTask()
+{
+    isEditing = true;
+    task = qobject_cast<Task*>(sender());
+
+    QString table = sqlOperation("SELECT", qobject_cast<Task*>(sender()));
+    query.next();
+    form->setTitle(query.value("title").toString());
+    form->setContent(query.value("content").toString());
+
+    if (table == "today") openedForm = 0;
+    else if (table == "week") openedForm = 1;
+    else if (table == "month") openedForm = 2;
+
+    this->hide();
+    form->move(this->pos());
+    form->show();
+    form->lineEdit()->setFocus();
 }

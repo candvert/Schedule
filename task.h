@@ -24,6 +24,7 @@ signals:
     void actionSignal();
     void deleteSignal(QString title);
     void checkedSignal();
+    void editSignal();
 
 protected:
     virtual void mousePressEvent(QMouseEvent *e) override;

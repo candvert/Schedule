@@ -30,11 +30,11 @@ QWidget *Form::lineEdit()
     return ui->lineEdit;
 }
 
-void Form::closeEvent(QCloseEvent *)
+void Form::hideEvent(QHideEvent *)
 {
     ui->lineEdit->setText("");
     ui->textEdit->setPlainText("");
-    emit buttonClicked();
+    emit escapePressed();
 }
 
 void Form::slotButtonClicked()
@@ -54,6 +54,22 @@ void Form::keyPressEvent(QKeyEvent *event)
         ui->lineEdit->setText("");
         ui->textEdit->setPlainText("");
         emit buttonClicked();
+    } else if (event->key() == Qt::Key_Escape) {
+        ui->lineEdit->setText("");
+        ui->textEdit->setPlainText("");
+        emit escapePressed();
     }
     QWidget::keyPressEvent(event);
+}
+
+bool Form::setTitle(const QString &title)
+{
+    ui->lineEdit->setText(title);
+    return true;
+}
+
+bool Form::setContent(const QString &content)
+{
+    ui->textEdit->setPlainText(content);
+    return true;
 }
